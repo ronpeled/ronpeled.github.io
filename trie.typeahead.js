@@ -121,7 +121,7 @@ var trieAutosuggest = function(myTrie) {
     return function findMatches(q, cb) {
 
         var matches = myTrie.autosuggest(q);
-        $('#matches-count').html(matches.length);
+        $('#matches-count').text(matches.length);
         $('#matches-count').css('background-color', 'yellow');
 
         cb(matches);
@@ -130,35 +130,53 @@ var trieAutosuggest = function(myTrie) {
 
 
 // Potentially help speed up page load, but a copy is already passed to the typeahead function
-// TODO: try to fix this by adding a callback when the queue reached the end (nextItem == empty)
 
-// function processItems(items, processItem, delay){
-//     delay = delay || 10
-//     var queue = items.slice(0)
-//     function processNextBatch(){
-//         var nextItem,
-//             startTime = +new Date
-//         while(startTime + 100 >= +new Date){
-//             nextItem = queue.shift()
-//             if (!nextItem) return
-//             processItem(nextItem)
-//         }
-//         setTimeout(processNextBatch, delay)
-//     }
-//     processNextBatch()
-// }
-//
-// function addWordToTrie(word) {
-//     englishTrie.insert(word);
-// }
-//
-// processItems(allEnglishWords, addWordToTrie);
+function processItems(items, processItem){
 
-$(function() {
+    // Caching the length is a micro optimization
+    var length = items.length;
+    var index = 0;
 
-    for (var i=0; i<allEnglishWords.length; i++) {
-        englishTrie.insert(allEnglishWords[i]);
-    }
+    // Don't copy the array again...
+    //var queue = items.slice(0)
+
+    // console.time('processItems ' + length);
+
+    // IIFE
+    (function processNextBatch() {
+        var maxBlockingTime = Date.now();
+        while (index < length) {
+
+            // this operation is so heavy that I had no patience to wait it finish to know how 
+            // long it would take. lol :)
+            // nextItem = queue.shift()
+
+            processItem(items[index]);
+            index++;
+
+            // Date.now() is heavier then math operations, from 2633~2842 to 2553~2055ms
+            if (index % 1e4 == 0 && maxBlockingTime + 100 <= Date.now()) {
+                maxBlockingTime = Date.now();
+                break;
+            }
+        }
+        if (index == length) {
+            // console.timeEnd('processItems ' + length);
+            return;
+        };
+
+        // You don't need to wait for 10ms, if you have 0, the operation will be moved to the
+        // end of the JavaScript event loop, witch means that any user action or animation will 
+        // be executed and this won't be a blocking operation
+        setTimeout(processNextBatch, 0);
+    }());
+}
+
+$.when($.ready, $.getScript('english-words.js')).then(function() {
+
+    processItems(allEnglishWords, function (word) {
+        englishTrie.insert(word);
+    });
 
     $('.typeahead').typeahead({
             hint: true,
@@ -168,6 +186,9 @@ $(function() {
         {
             name: 'states',
             limit: 15,
+
+            // If you apply the limit in your trieAutosuggest to at least stop the nodes 
+            // it also will became faster, but you will lose the nodes counter precision
             source: trieAutosuggest(englishTrie)
         });
 
