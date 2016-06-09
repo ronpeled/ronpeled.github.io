@@ -125,7 +125,10 @@ let actions = {
 
         postMessage({
            command: 'matches',
-           value: matches
+           value: {
+               list: matches,
+               query: q
+           }
         });
     }
 }

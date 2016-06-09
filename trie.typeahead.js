@@ -44,12 +44,16 @@ let actions = {
         promises.nodesLength = promises.nodesLength.promise();
     },
 
-    matches(list) {
+    matches(data) {
         $(() => {
-            $('#matches-count').text(list.length);
+            $('#matches-count').text(data.list.length);
             $('#matches-count').css('background-color', 'yellow');
         });
-        query.callQueue.shift()(list);
+        let asyncCb = query.callQueue.shift();
+        if (query.callQueue.length == 0) {
+            asyncCb(data.list);
+        }
+        query.cache[data.query] = data.list;
     }
 }
 
